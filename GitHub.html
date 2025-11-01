@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Sync - Watch Together</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            padding: 20px 0;
+            margin-bottom: 30px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            display: inline-block;
+        }
+
+        .tagline {
+            font-size: 1.1rem;
+            color: #a0a0a0;
+        }
+
+        .app-container {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 20px;
+            min-height: 70vh;
+        }
+
+        .auth-section, .video-controls, .video-player, .chat-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .video-player {
+            grid-column: 2;
+            position: relative;
+        }
+
+        .chat-section {
+            grid-column: 3;
+            display: flex;
+            flex-direction: column;
+        }
+
+        h2 {
+            margin-bottom: 15px;
+            color: #feca57;
+            font-size: 1.3rem;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 5px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            font-size: 0.9rem;
+        }
+
+        button {
+            background: linear-gradient(90deg, #ff6b6b, #feca57);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 8px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        .secondary-btn {
+            background: transparent;
+            border: 1px solid #feca57;
+        }
+
+        .code-display {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px;
+            border-radius: 5px;
+            margin-top: 12px;
+            text-align: center;
+            font-size: 1.3rem;
+            letter-spacing: 2px;
+            font-weight: bold;
+            color: #feca57;
+            display: none;
+        }
+
+        #video-container {
+            position: relative;
+            width: 100%;
+            height: 0;
+            padding-bottom: 56.25%; /* 16:9 aspect ratio */
+            margin-bottom: 15px;
+            background: #000;
+        }
+
+        #video-player {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+            border: none;
+        }
+
+        .video-controls-full {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .video-controls-full button {
+            flex: 1;
+            margin: 0;
+            padding: 8px 12px;
+            font-size: 0.8rem;
+        }
+
+        .fullscreen-btn {
+            background: linear-gradient(90deg, #48dbfb, #ff9ff3);
+        }
+
+        .session-info {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px;
+            border-radius: 5px;
+            margin-top: 12px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .user-avatar {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            background: linear-gradient(90deg, #ff6b6b, #feca57);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .error-message {
+            color: #ff6b6b;
+            margin-top: 8px;
+            text-align: center;
+            font-size: 0.8rem;
+        }
+
+        .success-message {
+            color: #1dd1a1;
+            margin-top: 8px;
+            text-align: center;
+            font-size: 0.8rem;
+        }
+
+        .participants {
+            margin-top: 15px;
+        }
+
+        .participant-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .participant {
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 6px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }
+
+        .participant-avatar {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #48dbfb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 6px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        .player-controls {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .player-controls button {
+            flex: 1;
+            margin: 0;
+            padding: 8px 12px;
+            font-size: 0.8rem;
+        }
+
+        .sync-status {
+            margin-top: 8px;
+            text-align: center;
+            font-size: 0.8rem;
+            color: #a0a0a0;
+        }
+
+        /* Chat Styles */
+        .chat-messages {
+            flex-grow: 1;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 300px;
+        }
+
+        .chat-message {
+            padding: 8px 12px;
+            border-radius: 10px;
+            max-width: 85%;
+            word-wrap: break-word;
+        }
+
+        .message-own {
+            align-self: flex-end;
+            background: linear-gradient(90deg, #ff6b6b, #feca57);
+            border-bottom-right-radius: 2px;
+        }
+
+        .message-other {
+            align-self: flex-start;
+            background: rgba(255, 255, 255, 0.1);
+            border-bottom-left-radius: 2px;
+        }
+
+        .message-sender {
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-bottom: 3px;
+            opacity: 0.8;
+        }
+
+        .message-text {
+            font-size: 0.9rem;
+        }
+
+        .message-time {
+            font-size: 0.6rem;
+            text-align: right;
+            margin-top: 3px;
+            opacity: 0.7;
+        }
+
+        .chat-input-container {
+            display: flex;
+            gap: 8px;
+        }
+
+        #chat-input {
+            flex-grow: 1;
+            padding: 8px 12px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            font-size: 0.9rem;
+        }
+
+        #send-chat {
+            width: auto;
+            padding: 8px 15px;
+            border-radius: 20px;
+            margin: 0;
+        }
+
+        .chat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .chat-toggle {
+            background: transparent;
+            border: 1px solid #48dbfb;
+            width: auto;
+            padding: 5px 10px;
+            font-size: 0.7rem;
+        }
+
+        /* Fixed Fullscreen styles */
+        body.fullscreen {
+            padding: 0;
+            overflow: hidden;
+        }
+
+        body.fullscreen .container {
+            max-width: 100%;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+
+        body.fullscreen .app-container {
+            grid-template-columns: 1fr;
+            grid-template-rows: 1fr;
+            height: 100vh;
+            gap: 0;
+        }
+
+        body.fullscreen .auth-section,
+        body.fullscreen .video-controls,
+        body.fullscreen .chat-section {
+            display: none !important;
+        }
+
+        body.fullscreen .video-player {
+            grid-column: 1;
+            grid-row: 1;
+            border-radius: 0;
+            padding: 0;
+            background: transparent;
+            box-shadow: none;
+            border: none;
+            backdrop-filter: none;
+        }
+
+        body.fullscreen #video-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            padding-bottom: 0;
+            margin: 0;
+            z-index: 1000;
+        }
+
+        body.fullscreen #video-player {
+            border-radius: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        body.fullscreen .video-controls-full {
+            display: none;
+        }
+
+        body.fullscreen .video-controls-overlay {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            display: flex;
+            gap: 10px;
+            z-index: 1001;
+            backdrop-filter: blur(10px);
+        }
+
+        body.fullscreen .video-controls-overlay button {
+            width: auto;
+            padding: 10px 20px;
+            margin: 0;
+            font-size: 0.9rem;
+        }
+
+        body.fullscreen .video-controls-overlay.hidden {
+            display: none;
+        }
+
+        /* Video placeholder */
+        #video-placeholder {
+            text-align: center;
+            padding: 60px 20px;
+            color: #a0a0a0;
+            font-size: 1.1rem;
+        }
+
+        @media (max-width: 1024px) {
+            .app-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto;
+                height: auto;
+            }
+
+            .video-player {
+                grid-column: 1;
+                min-height: 400px;
+            }
+
+            .chat-section {
+                grid-column: 1;
+                min-height: 300px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .app-container {
+                gap: 15px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .auth-section, .video-controls, .video-player, .chat-section {
+                padding: 15px;
+            }
+
+            body.fullscreen .video-controls-overlay {
+                bottom: 10px;
+                padding: 10px;
+            }
+
+            body.fullscreen .video-controls-overlay button {
+                padding: 8px 15px;
+                font-size: 0.8rem;
+            }
+        }
+
+        /* Loading state */
+        .video-loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 1.2rem;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>YouTube Sync</h1>
+            <p class="tagline">Watch YouTube videos in sync with friends</p>
+        </header>
+        
+        <div class="app-container">
+            <section class="auth-section">
+                <h2>Account</h2>
+                <div id="auth-container">
+                    <div id="login-form">
+                        <div class="form-group">
+                            <label for="login-email">Email</label>
+                            <input type="email" id="login-email" placeholder="Enter your email">
+                        </div>
+                        <div class="form-group">
+                            <label for="login-password">Password</label>
+                            <input type="password" id="login-password" placeholder="Enter your password">
+                        </div>
+                        <button id="login-btn">Sign In</button>
+                        <button id="show-signup" class="secondary-btn">Create Account</button>
+                    </div>
+                    
+                    <div id="signup-form" class="hidden">
+                        <div class="form-group">
+                            <label for="signup-email">Email</label>
+                            <input type="email" id="signup-email" placeholder="Enter your email">
+                        </div>
+                        <div class="form-group">
+                            <label for="signup-username">Username</label>
+                            <input type="text" id="signup-username" placeholder="Choose a username">
+                        </div>
+                        <div class="form-group">
+                            <label for="signup-password">Password</label>
+                            <input type="password" id="signup-password" placeholder="Create a password">
+                        </div>
+                        <button id="signup-btn">Create Account</button>
+                        <button id="show-login" class="secondary-btn">Already have an account?</button>
+                    </div>
+                </div>
+                
+                <div id="user-info" class="hidden">
+                    <div class="user-info">
+                        <div class="user-avatar" id="user-avatar">U</div>
+                        <div>
+                            <div id="user-name">User</div>
+                            <div id="user-email">user@example.com</div>
+                        </div>
+                    </div>
+                    <button id="logout-btn">Sign Out</button>
+                </div>
+                
+                <div id="auth-message" class="error-message"></div>
+            </section>
+            
+            <section class="video-player">
+                <h2>Video Player</h2>
+                <div id="video-container">
+                    <div id="video-player"></div>
+                    <div class="video-controls-overlay hidden">
+                        <button id="overlay-play-btn">Play</button>
+                        <button id="overlay-pause-btn">Pause</button>
+                        <button id="overlay-sync-btn">Sync</button>
+                        <button id="overlay-fullscreen-exit" class="fullscreen-btn">Exit Fullscreen</button>
+                    </div>
+                </div>
+                <div id="video-placeholder" style="text-align: center; padding: 40px;">
+                    <p>Create or join a session to start watching videos together</p>
+                </div>
+                
+                <div class="video-controls-full">
+                    <button id="play-btn">Play</button>
+                    <button id="pause-btn">Pause</button>
+                    <button id="sync-btn">Sync Now</button>
+                    <button id="fullscreen-btn" class="fullscreen-btn">Fullscreen</button>
+                </div>
+                
+                <div class="sync-status" id="sync-status">Synchronized</div>
+            </section>
+            
+            <section class="video-controls">
+                <h2>Create or Join Session</h2>
+                <div id="session-controls">
+                    <div class="form-group">
+                        <label for="youtube-url">YouTube URL</label>
+                        <input type="text" id="youtube-url" placeholder="Paste YouTube link here">
+                    </div>
+                    <button id="create-session">Create Session</button>
+                    
+                    <div class="code-display" id="session-code-display">
+                        Session Code: <span id="session-code"></span>
+                    </div>
+                    
+                    <div style="margin: 15px 0; text-align: center; font-weight: bold;">OR</div>
+                    
+                    <div class="form-group">
+                        <label for="join-code">Join with Code</label>
+                        <input type="text" id="join-code" placeholder="Enter session code">
+                    </div>
+                    <button id="join-session">Join Session</button>
+                </div>
+                
+                <div id="session-info" class="session-info hidden">
+                    <h3>Session Info</h3>
+                    <div>Host: <span id="session-host">Unknown</span></div>
+                    <div>Video: <span id="session-video-title">Unknown</span></div>
+                    
+                    <div class="participants">
+                        <h4>Participants</h4>
+                        <div class="participant-list" id="participant-list">
+                            <!-- Participants will be added here dynamically -->
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="session-message" class="error-message"></div>
+            </section>
+            
+            <section class="chat-section">
+                <div class="chat-header">
+                    <h2>Live Chat</h2>
+                    <button id="toggle-chat" class="chat-toggle">Hide</button>
+                </div>
+                <div class="chat-messages" id="chat-messages">
+                    <div class="chat-message message-other">
+                        <div class="message-sender">System</div>
+                        <div class="message-text">Welcome to the chat! Say hello to everyone.</div>
+                        <div class="message-time">Just now</div>
+                    </div>
+                </div>
+                <div class="chat-input-container">
+                    <input type="text" id="chat-input" placeholder="Type a message...">
+                    <button id="send-chat">Send</button>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            // Firebase configuration from environment variables
+const firebaseConfig = {
+    apiKey: process.env.APIKEY,
+    authDomain: process.env.AUTHDOMAIN,
+    databaseURL: process.env.DATABASEURL,
+    projectId: process.env.PROJECTID,
+    storageBucket: process.env.STORAGEBUCKET,
+    messagingSenderId: process.env.MESSAGINGSENDERID,
+    appId: process.env.APPID,
+    measurementId: process.env.MEASUREMENTID
+};
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const database = firebase.database();
+
+        // Global variables
+        let currentSessionCode = null;
+        let isHost = false;
+        let isSyncing = false;
+        let syncTimeout = null;
+        let syncInterval = null;
+        let lastSyncTime = 0;
+        let lastHostState = null;
+        let isFullscreen = false;
+        let chatVisible = true;
+
+        // DOM Elements
+        const loginForm = document.getElementById('login-form');
+        const signupForm = document.getElementById('signup-form');
+        const userInfo = document.getElementById('user-info');
+        const authMessage = document.getElementById('auth-message');
+        const sessionMessage = document.getElementById('session-message');
+        const sessionCodeDisplay = document.getElementById('session-code-display');
+        const sessionCodeSpan = document.getElementById('session-code');
+        const sessionInfo = document.getElementById('session-info');
+        const videoPlaceholder = document.getElementById('video-placeholder');
+        const participantList = document.getElementById('participant-list');
+        const syncStatus = document.getElementById('sync-status');
+        const chatMessages = document.getElementById('chat-messages');
+        const chatInput = document.getElementById('chat-input');
+        const sendChatBtn = document.getElementById('send-chat');
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+        const toggleChatBtn = document.getElementById('toggle-chat');
+        const overlayControls = document.querySelector('.video-controls-overlay');
+        const exitFullscreenBtn = document.getElementById('overlay-fullscreen-exit');
+
+        // Auth state listener
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                // User is signed in
+                loginForm.classList.add('hidden');
+                signupForm.classList.add('hidden');
+                userInfo.classList.remove('hidden');
+                
+                document.getElementById('user-email').textContent = user.email;
+                document.getElementById('user-name').textContent = user.displayName || user.email.split('@')[0];
+                document.getElementById('user-avatar').textContent = (user.displayName || user.email[0]).toUpperCase();
+                
+                // Clear auth message
+                authMessage.textContent = '';
+                authMessage.classList.remove('success-message', 'error-message');
+            } else {
+                // User is signed out
+                loginForm.classList.remove('hidden');
+                signupForm.classList.add('hidden');
+                userInfo.classList.add('hidden');
+                sessionCodeDisplay.style.display = 'none';
+                sessionInfo.classList.add('hidden');
+                videoPlaceholder.style.display = 'block';
+                
+                // Reset YouTube player
+                if (window.ytPlayer) {
+                    window.ytPlayer.destroy();
+                }
+                
+                // Leave current session
+                if (currentSessionCode) {
+                    leaveSession();
+                }
+            }
+        });
+
+        // Auth event handlers
+        document.getElementById('login-btn').addEventListener('click', () => {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            
+            auth.signInWithEmailAndPassword(email, password)
+                .then(() => {
+                    authMessage.textContent = 'Signed in successfully!';
+                    authMessage.classList.remove('error-message');
+                    authMessage.classList.add('success-message');
+                })
+                .catch(error => {
+                    authMessage.textContent = error.message;
+                    authMessage.classList.remove('success-message');
+                    authMessage.classList.add('error-message');
+                });
+        });
+
+        document.getElementById('signup-btn').addEventListener('click', () => {
+            const email = document.getElementById('signup-email').value;
+            const username = document.getElementById('signup-username').value;
+            const password = document.getElementById('signup-password').value;
+            
+            auth.createUserWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    // Update profile with username
+                    return userCredential.user.updateProfile({
+                        displayName: username
+                    });
+                })
+                .then(() => {
+                    authMessage.textContent = 'Account created successfully!';
+                    authMessage.classList.remove('error-message');
+                    authMessage.classList.add('success-message');
+                })
+                .catch(error => {
+                    authMessage.textContent = error.message;
+                    authMessage.classList.remove('success-message');
+                    authMessage.classList.add('error-message');
+                });
+        });
+
+        document.getElementById('show-signup').addEventListener('click', () => {
+            loginForm.classList.add('hidden');
+            signupForm.classList.remove('hidden');
+            authMessage.textContent = '';
+        });
+
+        document.getElementById('show-login').addEventListener('click', () => {
+            signupForm.classList.add('hidden');
+            loginForm.classList.remove('hidden');
+            authMessage.textContent = '';
+        });
+
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            auth.signOut();
+        });
+
+        // Session management
+        document.getElementById('create-session').addEventListener('click', () => {
+            const url = document.getElementById('youtube-url').value;
+            const videoId = extractYouTubeId(url);
+            
+            if (!videoId) {
+                sessionMessage.textContent = 'Please enter a valid YouTube URL';
+                sessionMessage.classList.remove('success-message');
+                sessionMessage.classList.add('error-message');
+                return;
+            }
+            
+            // Generate a random 6-character code
+            const code = generateSessionCode();
+            const user = auth.currentUser;
+            
+            // Create session in database
+            database.ref('sessions/' + code).set({
+                host: user.uid,
+                hostName: user.displayName || user.email,
+                videoId: videoId,
+                timestamp: firebase.database.ServerValue.TIMESTAMP,
+                playbackState: {
+                    currentTime: 0,
+                    playing: false,
+                    lastUpdated: firebase.database.ServerValue.TIMESTAMP,
+                    updatedBy: user.uid
+                },
+                participants: {
+                    [user.uid]: {
+                        name: user.displayName || user.email,
+                        joinedAt: firebase.database.ServerValue.TIMESTAMP
+                    }
+                }
+            }).then(() => {
+                // Set current session
+                currentSessionCode = code;
+                isHost = true;
+                
+                // Display the session code
+                sessionCodeSpan.textContent = code;
+                sessionCodeDisplay.style.display = 'block';
+                sessionMessage.textContent = 'Session created successfully! Share the code with others.';
+                sessionMessage.classList.remove('error-message');
+                sessionMessage.classList.add('success-message');
+                
+                // Load the video
+                loadYouTubeVideo(videoId);
+                
+                // Update session info
+                updateSessionInfo(code);
+                
+                // Listen for session changes
+                listenToSessionChanges(code);
+                
+                // Initialize chat
+                initializeChat(code);
+            }).catch(error => {
+                sessionMessage.textContent = 'Error creating session: ' + error.message;
+                sessionMessage.classList.remove('success-message');
+                sessionMessage.classList.add('error-message');
+            });
+        });
+
+        document.getElementById('join-session').addEventListener('click', () => {
+            const code = document.getElementById('join-code').value.toUpperCase();
+            const user = auth.currentUser;
+            
+            if (!code || code.length !== 6) {
+                sessionMessage.textContent = 'Please enter a valid 6-character code';
+                sessionMessage.classList.remove('success-message');
+                sessionMessage.classList.add('error-message');
+                return;
+            }
+            
+            // Check if session exists
+            database.ref('sessions/' + code).once('value').then(snapshot => {
+                if (snapshot.exists()) {
+                    const session = snapshot.val();
+                    
+                    // Add user to participants
+                    database.ref('sessions/' + code + '/participants/' + user.uid).set({
+                        name: user.displayName || user.email,
+                        joinedAt: firebase.database.ServerValue.TIMESTAMP
+                    });
+                    
+                    // Set current session
+                    currentSessionCode = code;
+                    isHost = false;
+                    
+                    // Load the video
+                    loadYouTubeVideo(session.videoId);
+                    
+                    // Update session info
+                    updateSessionInfo(code);
+                    
+                    // Listen for session changes
+                    listenToSessionChanges(code);
+                    
+                    // Initialize chat
+                    initializeChat(code);
+                    
+                    sessionMessage.textContent = 'Joined session successfully!';
+                    sessionMessage.classList.remove('error-message');
+                    sessionMessage.classList.add('success-message');
+                } else {
+                    sessionMessage.textContent = 'Session not found. Please check the code.';
+                    sessionMessage.classList.remove('success-message');
+                    sessionMessage.classList.add('error-message');
+                }
+            });
+        });
+
+        // Player control buttons
+        document.getElementById('play-btn').addEventListener('click', () => {
+            if (window.ytPlayer && window.ytPlayer.playVideo) {
+                window.ytPlayer.playVideo();
+            }
+        });
+
+        document.getElementById('pause-btn').addEventListener('click', () => {
+            if (window.ytPlayer && window.ytPlayer.pauseVideo) {
+                window.ytPlayer.pauseVideo();
+            }
+        });
+
+        document.getElementById('sync-btn').addEventListener('click', () => {
+            syncWithHost();
+        });
+
+        // Fullscreen functionality
+        fullscreenBtn.addEventListener('click', toggleFullscreen);
+        exitFullscreenBtn.addEventListener('click', toggleFullscreen);
+
+        // Chat functionality
+        sendChatBtn.addEventListener('click', sendChatMessage);
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendChatMessage();
+            }
+        });
+
+        // Toggle chat visibility
+        toggleChatBtn.addEventListener('click', () => {
+            chatVisible = !chatVisible;
+            const chatSection = document.querySelector('.chat-section');
+            if (chatVisible) {
+                chatSection.style.display = 'flex';
+                toggleChatBtn.textContent = 'Hide';
+            } else {
+                chatSection.style.display = 'none';
+                toggleChatBtn.textContent = 'Show';
+            }
+        });
+
+        // Overlay controls for fullscreen
+        document.getElementById('overlay-play-btn').addEventListener('click', () => {
+            if (window.ytPlayer && window.ytPlayer.playVideo) {
+                window.ytPlayer.playVideo();
+            }
+        });
+
+        document.getElementById('overlay-pause-btn').addEventListener('click', () => {
+            if (window.ytPlayer && window.ytPlayer.pauseVideo) {
+                window.ytPlayer.pauseVideo();
+            }
+        });
+
+        document.getElementById('overlay-sync-btn').addEventListener('click', () => {
+            syncWithHost();
+        });
+
+        // Show/hide overlay controls in fullscreen
+        document.getElementById('video-container').addEventListener('mousemove', () => {
+            if (isFullscreen) {
+                overlayControls.classList.remove('hidden');
+                clearTimeout(overlayControls.timeout);
+                overlayControls.timeout = setTimeout(() => {
+                    overlayControls.classList.add('hidden');
+                }, 3000);
+            }
+        });
+
+        // Smart sync functions
+        function startSmartSync() {
+            if (syncInterval) clearInterval(syncInterval);
+            
+            // Only sync if we're NOT the host and we're in a session
+            if (!isHost && currentSessionCode) {
+                // Listen for real-time playback state changes instead of polling
+                database.ref('sessions/' + currentSessionCode + '/playbackState').on('value', (snapshot) => {
+                    if (!isSyncing && snapshot.exists() && window.ytPlayer && window.ytPlayer.getCurrentTime) {
+                        const playbackState = snapshot.val();
+                        const currentUser = auth.currentUser;
+                        
+                        // Skip if this update was triggered by current user or we're already syncing
+                        if (playbackState.updatedBy === currentUser.uid || isSyncing) {
+                            return;
+                        }
+                        
+                        // Immediate sync for play/pause commands
+                        syncWithHost();
+                    }
+                });
+            }
+        }
+
+        function stopSmartSync() {
+            if (currentSessionCode) {
+                database.ref('sessions/' + currentSessionCode + '/playbackState').off('value');
+            }
+            if (syncInterval) {
+                clearInterval(syncInterval);
+                syncInterval = null;
+            }
+        }
+
+        // YouTube player functions
+        function loadYouTubeVideo(videoId) {
+            videoPlaceholder.style.display = 'none';
+            
+            // Load YouTube IFrame API if not already loaded
+            if (!window.YT) {
+                const tag = document.createElement('script');
+                tag.src = "https://www.youtube.com/iframe_api";
+                const firstScriptTag = document.getElementsByTagName('script')[0];
+                firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+                
+                window.onYouTubeIframeAPIReady = () => {
+                    createPlayer(videoId);
+                };
+            } else {
+                createPlayer(videoId);
+            }
+        }
+
+        function createPlayer(videoId) {
+            if (window.ytPlayer) {
+                window.ytPlayer.destroy();
+            }
+            
+            window.ytPlayer = new YT.Player('video-player', {
+                height: '100%',
+                width: '100%',
+                videoId: videoId,
+                playerVars: {
+                    'playsinline': 1,
+                    'enablejsapi': 1,
+                    'origin': window.location.origin
+                },
+                events: {
+                    'onReady': onPlayerReady,
+                    'onStateChange': onPlayerStateChange,
+                    'onError': onPlayerError
+                }
+            });
+        }
+
+        function onPlayerReady(event) {
+            console.log('YouTube player ready');
+            // If we're not the host, sync with the host's playback state
+            if (!isHost && currentSessionCode) {
+                setTimeout(() => {
+                    syncWithHost();
+                }, 1000);
+            }
+        }
+
+        function onPlayerStateChange(event) {
+            // Only update playback state if we're the host and not currently syncing
+            if (isHost && !isSyncing) {
+                const state = event.data;
+                
+                // Reduced debouncing time from 300ms to 100ms
+                clearTimeout(window.stateChangeTimeout);
+                window.stateChangeTimeout = setTimeout(() => {
+                    if (!isSyncing && window.ytPlayer) {
+                        if (state === YT.PlayerState.PLAYING) {
+                            updatePlaybackState(true);
+                        } else if (state === YT.PlayerState.PAUSED || state === YT.PlayerState.ENDED) {
+                            updatePlaybackState(false);
+                        }
+                    }
+                }, 100); // Reduced from 300ms to 100ms
+            }
+        }
+
+        function onPlayerError(event) {
+            console.error('YouTube player error:', event.data);
+            sessionMessage.textContent = 'Error loading video. Please check the URL.';
+            sessionMessage.classList.remove('success-message');
+            sessionMessage.classList.add('error-message');
+        }
+
+        // Playback synchronization functions
+        function updatePlaybackState(playing) {
+            if (!currentSessionCode || !window.ytPlayer || isSyncing) return;
+            
+            const currentTime = window.ytPlayer.getCurrentTime();
+            const user = auth.currentUser;
+            
+            // Remove the state change check - update immediately
+            database.ref('sessions/' + currentSessionCode + '/playbackState').set({
+                currentTime: currentTime,
+                playing: playing,
+                lastUpdated: firebase.database.ServerValue.TIMESTAMP,
+                updatedBy: user.uid
+            });
+            
+            lastHostState = { playing, currentTime };
+        }
+
+        function startPlaybackSync() {
+            if (syncTimeout) clearInterval(syncTimeout);
+            
+            // Update every 1 second instead of 3 seconds while playing
+            syncTimeout = setInterval(() => {
+                if (isHost && window.ytPlayer && 
+                    window.ytPlayer.getPlayerState() === YT.PlayerState.PLAYING && 
+                    !isSyncing) {
+                    updatePlaybackState(true);
+                }
+            }, 1000); // Reduced from 3000ms to 1000ms
+        }
+
+        function stopPlaybackSync() {
+            if (syncTimeout) {
+                clearInterval(syncTimeout);
+                syncTimeout = null;
+            }
+        }
+
+        function syncWithHost() {
+            if (!currentSessionCode || !window.ytPlayer || isSyncing) return;
+            
+            isSyncing = true;
+            syncStatus.textContent = 'Syncing...';
+            lastSyncTime = Date.now();
+            
+            database.ref('sessions/' + currentSessionCode + '/playbackState').once('value').then(snapshot => {
+                if (snapshot.exists()) {
+                    const playbackState = snapshot.val();
+                    const currentTime = window.ytPlayer.getCurrentTime();
+                    const playerState = window.ytPlayer.getPlayerState();
+                    
+                    // Immediate play/pause sync (no delay)
+                    if (playbackState.playing && playerState !== YT.PlayerState.PLAYING) {
+                        window.ytPlayer.playVideo();
+                    } else if (!playbackState.playing && playerState === YT.PlayerState.PLAYING) {
+                        window.ytPlayer.pauseVideo();
+                    }
+                    
+                    // Seek only if difference is significant
+                    if (Math.abs(currentTime - playbackState.currentTime) > 0.5) {
+                        window.ytPlayer.seekTo(playbackState.currentTime, true);
+                    }
+                    
+                    syncStatus.textContent = 'Synchronized';
+                }
+                
+                isSyncing = false;
+            }).catch(error => {
+                console.error('Sync error:', error);
+                isSyncing = false;
+                syncStatus.textContent = 'Sync failed';
+            });
+        }
+
+        // Chat functions
+        function initializeChat(sessionCode) {
+            // Clear existing messages
+            chatMessages.innerHTML = '';
+            
+            // Listen for new messages
+            database.ref('sessions/' + sessionCode + '/chat').on('child_added', (snapshot) => {
+                const message = snapshot.val();
+                addMessageToChat(message);
+            });
+        }
+
+        function sendChatMessage() {
+            const messageText = chatInput.value.trim();
+            if (!messageText || !currentSessionCode) return;
+            
+            const user = auth.currentUser;
+            const message = {
+                text: messageText,
+                sender: user.displayName || user.email,
+                senderId: user.uid,
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            };
+            
+            // Push message to Firebase
+            database.ref('sessions/' + currentSessionCode + '/chat').push(message)
+                .then(() => {
+                    chatInput.value = ''; // Clear input
+                })
+                .catch(error => {
+                    console.error('Error sending message:', error);
+                });
+        }
+
+        function addMessageToChat(message) {
+            const messageElement = document.createElement('div');
+            messageElement.className = `chat-message ${message.senderId === auth.currentUser.uid ? 'message-own' : 'message-other'}`;
+            
+            const time = new Date(message.timestamp);
+            const timeString = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            
+            messageElement.innerHTML = `
+                <div class="message-sender">${message.sender}</div>
+                <div class="message-text">${message.text}</div>
+                <div class="message-time">${timeString}</div>
+            `;
+            
+            chatMessages.appendChild(messageElement);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Fixed Fullscreen functions
+        function toggleFullscreen() {
+            if (!isFullscreen) {
+                // Enter fullscreen
+                document.body.classList.add('fullscreen');
+                isFullscreen = true;
+                overlayControls.classList.remove('hidden');
+                
+                // Hide overlay after 3 seconds
+                overlayControls.timeout = setTimeout(() => {
+                    overlayControls.classList.add('hidden');
+                }, 3000);
+                
+                // Force YouTube player to resize for fullscreen
+                setTimeout(() => {
+                    if (window.ytPlayer && window.ytPlayer.setSize) {
+                        window.ytPlayer.setSize(window.innerWidth, window.innerHeight);
+                    }
+                }, 100);
+            } else {
+                // Exit fullscreen
+                document.body.classList.remove('fullscreen');
+                isFullscreen = false;
+                overlayControls.classList.add('hidden');
+                
+                // Reset YouTube player size
+                setTimeout(() => {
+                    if (window.ytPlayer && window.ytPlayer.setSize) {
+                        const container = document.getElementById('video-container');
+                        window.ytPlayer.setSize(container.offsetWidth, container.offsetHeight);
+                    }
+                }, 100);
+            }
+        }
+
+        // Handle window resize for fullscreen
+        window.addEventListener('resize', () => {
+            if (isFullscreen && window.ytPlayer && window.ytPlayer.setSize) {
+                window.ytPlayer.setSize(window.innerWidth, window.innerHeight);
+            }
+        });
+
+        // Utility functions
+        function extractYouTubeId(url) {
+            const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[7].length === 11) ? match[7] : false;
+        }
+
+        function generateSessionCode() {
+            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let result = '';
+            for (let i = 0; i < 6; i++) {
+                result += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+            return result;
+        }
+
+        function updateSessionInfo(code) {
+            database.ref('sessions/' + code).once('value').then(snapshot => {
+                const session = snapshot.val();
+                document.getElementById('session-host').textContent = session.hostName;
+                
+                // Get video title (this would require additional API call in a real app)
+                document.getElementById('session-video-title').textContent = 'YouTube Video';
+                
+                // Update participants list
+                updateParticipantsList(session.participants);
+                
+                sessionInfo.classList.remove('hidden');
+            });
+        }
+
+        function updateParticipantsList(participants) {
+            participantList.innerHTML = '';
+            
+            for (const userId in participants) {
+                const participant = participants[userId];
+                const participantElement = document.createElement('div');
+                participantElement.className = 'participant';
+                
+                const avatar = document.createElement('div');
+                avatar.className = 'participant-avatar';
+                avatar.textContent = participant.name[0].toUpperCase();
+                
+                const name = document.createElement('div');
+                name.textContent = participant.name;
+                
+                participantElement.appendChild(avatar);
+                participantElement.appendChild(name);
+                participantList.appendChild(participantElement);
+            }
+        }
+
+        function listenToSessionChanges(code) {
+            // Start the real-time sync when joining a session as non-host
+            if (!isHost) {
+                startSmartSync();
+            }
+            
+            database.ref('sessions/' + code).on('value', snapshot => {
+                const session = snapshot.val();
+                if (session) {
+                    updateParticipantsList(session.participants);
+                } else {
+                    // Session was deleted - cleanup
+                    stopSmartSync();
+                    sessionMessage.textContent = 'Session has ended.';
+                    sessionMessage.classList.remove('success-message');
+                    sessionMessage.classList.add('error-message');
+                    
+                    sessionInfo.classList.add('hidden');
+                    videoPlaceholder.style.display = 'block';
+                    sessionCodeDisplay.style.display = 'none';
+                    
+                    if (window.ytPlayer) {
+                        window.ytPlayer.destroy();
+                    }
+                    
+                    currentSessionCode = null;
+                    isHost = false;
+                    stopPlaybackSync();
+                }
+            });
+        }
+
+        function leaveSession() {
+            if (currentSessionCode) {
+                stopSmartSync();
+                stopPlaybackSync();
+                
+                const user = auth.currentUser;
+                
+                // Remove user from participants
+                database.ref('sessions/' + currentSessionCode + '/participants/' + user.uid).remove();
+                
+                // If user was host, delete the session
+                if (isHost) {
+                    database.ref('sessions/' + currentSessionCode).remove();
+                }
+                
+                currentSessionCode = null;
+                isHost = false;
+                lastSyncTime = 0;
+                lastHostState = null;
+            }
+        }
+
+        // Clean up when page is closed or refreshed
+        window.addEventListener('beforeunload', () => {
+            leaveSession();
+        });
+    </script>
+</body>
+</html>
